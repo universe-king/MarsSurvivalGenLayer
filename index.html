@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mars Survival - GenLayer Studio Edition</title>
+    <link href="style.css" rel="stylesheet">
+    <style>
+        body {
+            background: radial-gradient(circle at center, #1e0b07 0%, #090302 100%);
+        }
+
+        #debugLog::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #debugLog::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        #debugLog::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "genlayer-js": "https://esm.sh/genlayer-js@latest",
+                "genlayer-js/chains": "https://esm.sh/genlayer-js@latest/chains",
+                "genlayer-js/types": "https://esm.sh/genlayer-js@latest/types"
+            }
+        }
+    </script>
+</head>
+
+<body class="text-gray-100 min-h-screen font-sans antialiased selection:bg-red-500 selection:text-white">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <header
+            class="flex flex-col sm:flex-row justify-between items-center border-b border-red-900/40 pb-6 mb-8 gap-4">
+            <div>
+                <h1
+                    class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-yellow-500">
+                    🔴 MARS SURVIVAL
+                </h1>
+                <p class="text-xs text-gray-400 mt-1">Powered by GenLayer AI Consensus (Studionet)</p>
+            </div>
+        </header>
+
+        <div id="walletInfo"
+            class="bg-black/40 border border-red-900/20 rounded-2xl p-4 mb-8 backdrop-blur-md flex flex-wrap gap-6 text-sm text-gray-300">
+            <div><span class="text-gray-500">Virtual Test Account:</span> <span id="userAddress"
+                    class="font-mono text-red-300 animate-pulse">Generating...</span></div>
+        </div>
+
+        <main class="space-y-8">
+            <section class="bg-stone-900/40 border border-stone-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-950 text-red-400 font-bold border border-red-800/50">1</span>
+                        <h2 class="text-xl font-bold text-stone-200">Initiate Mission</h2>
+                    </div>
+                    <button id="generateBtn"
+                        class="bg-stone-800 hover:bg-stone-700 text-stone-300 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-xl border border-stone-700 transition cursor-pointer"
+                        disabled>
+                        Generate Scenario
+                    </button>
+                </div>
+                <div id="scenarioLoader" class="hidden text-center py-6 text-stone-400 animate-pulse font-mono text-sm">
+                </div>
+                <div id="scenarioContainer"
+                    class="hidden bg-black/30 border border-stone-800/80 rounded-2xl p-5 text-gray-300 leading-relaxed font-serif text-base max-h-96 overflow-y-auto whitespace-pre-wrap">
+                </div>
+            </section>
+
+            <section class="bg-stone-900/40 border border-stone-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm">
+                <div class="flex items-center gap-3 mb-4">
+                    <span
+                        class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-950 text-red-400 font-bold border border-red-800/50">2</span>
+                    <h2 class="text-xl font-bold text-stone-200">Tactical Decisions</h2>
+                </div>
+                <div class="space-y-4">
+                    <textarea id="answersInput" rows="5"
+                        class="w-full bg-black/40 border border-stone-800 rounded-2xl p-4 text-gray-200 focus:outline-none focus:border-red-500/50 transition font-sans text-sm placeholder:text-stone-600"
+                        placeholder="Type your survival strategy here..."></textarea>
+                    <div class="flex justify-end">
+                        <button id="submitBtn"
+                            class="bg-gradient-to-r from-stone-800 to-stone-900 hover:from-red-950 hover:to-red-900 text-stone-400 hover:text-red-200 disabled:opacity-40 font-bold px-6 py-3 rounded-xl border border-stone-700 hover:border-red-800/60 shadow-md transition-all cursor-pointer"
+                            disabled>
+                            Submit to AI Judgement
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="verdictSection" class="hidden transition-all duration-500">
+                <div id="verdictCard" class="border rounded-3xl p-6 shadow-2xl backdrop-blur-md">
+                    <div class="text-center space-y-3">
+                        <h3 class="text-xs uppercase tracking-widest text-gray-400 font-bold">Consensus Verdict</h3>
+                        <div id="statusBadge"
+                            class="text-4xl font-black tracking-tighter inline-block px-6 py-2 rounded-2xl"></div>
+                        <div id="verdictLoader"
+                            class="hidden text-center py-4 text-stone-400 animate-pulse font-mono text-sm"></div>
+                        <p id="verdictLog"
+                            class="text-gray-300 text-sm leading-relaxed max-w-2xl mx-auto pt-4 border-t border-white/10 whitespace-pre-wrap">
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mt-12 bg-black/80 border border-gray-800 rounded-xl p-4">
+                <h3 class="text-xs text-gray-500 uppercase font-bold mb-2">Live System Logs</h3>
+                <div id="debugLog" class="h-32 overflow-y-auto text-xs font-mono text-green-400 space-y-1"></div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module">
+        import { createClient, createAccount } from "genlayer-js";
+        import { studionet } from "genlayer-js/chains";
+        import { TransactionStatus, ExecutionResult } from "genlayer-js/types";
+
+        const CONTRACT_ADDRESS = "0xAA05339f1F3476a29d273e5392D72bb03432f32a";
+
+        let client = null;
+        let account = null;
+        let userAccountAddress = null;
+        let currentScenarioText = "";
+
+        const generateBtn = document.getElementById('generateBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const debugLog = document.getElementById('debugLog');
+
+        function logEvent(msg, type = "info") {
+            const time = new Date().toLocaleTimeString();
+            let color = "text-green-400";
+            if (type === "error") color = "text-red-400";
+            if (type === "success") color = "text-blue-400";
+            if (type === "warning") color = "text-yellow-400";
+            debugLog.innerHTML += `<div class="${color}">[${time}] ${msg}</div>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        async function initStudioClient() {
+            try {
+                logEvent("Initializing Studionet Client...");
+                account = createAccount();
+                userAccountAddress = account.address;
+
+                client = createClient({
+                    chain: studionet,
+                    account: account
+                });
+
+                document.getElementById('userAddress').innerText = userAccountAddress;
+                document.getElementById('userAddress').classList.remove('animate-pulse');
+
+                if (CONTRACT_ADDRESS === "آدرس_جدید_شما_پس_از_دیپلوی_مجدد") {
+                    logEvent("WARNING: Please set CONTRACT_ADDRESS in the code!", "error");
+                } else {
+                    generateBtn.removeAttribute('disabled');
+                    submitBtn.removeAttribute('disabled');
+                    logEvent(`Virtual Account Created: ${userAccountAddress}`, "success");
+                    logEvent(`Connected to Studionet successfully!`, "success");
+                }
+            } catch (err) {
+                logEvent(`Initialization failed: ${err.message}`, "error");
+            }
+        }
+
+        initStudioClient();
+
+        generateBtn.addEventListener('click', async () => {
+            const loader = document.getElementById('scenarioLoader');
+            const container = document.getElementById('scenarioContainer');
+
+            loader.classList.remove('hidden');
+            container.classList.add('hidden');
+            generateBtn.disabled = true;
+
+            loader.innerText = "⏳ Sending transaction to Studionet...";
+            logEvent("Invoking generate_scenario...");
+
+            try {
+                const txHash = await client.writeContract({
+                    account: account,
+                    address: CONTRACT_ADDRESS,
+                    functionName: 'generate_scenario',
+                    args: [],
+                    value: 0n
+                });
+
+                loader.innerText = "⏳ Tx Sent! LLM is generating your scenario...";
+                logEvent(`Tx Hash: ${txHash}`);
+
+                const receipt = await client.waitForTransactionReceipt({
+                    hash: txHash,
+                    status: TransactionStatus.ACCEPTED,
+                    timeout: 600_000
+                });
+
+                if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
+                    throw new Error("Contract execution failed. Check GenLayer Studio logs.");
+                }
+
+                logEvent("Scenario generated! Fetching text from chain...", "success");
+                loader.innerText = "⏳ Reading scenario from blockchain...";
+
+                let attempts = 0;
+                currentScenarioText = "";
+
+                while (attempts < 10) {
+                    currentScenarioText = await client.readContract({
+                        address: CONTRACT_ADDRESS,
+                        functionName: 'get_scenario',
+                        args: [userAccountAddress],
+                        stateStatus: "accepted"
+                    });
+
+                    if (currentScenarioText && currentScenarioText.trim() !== "") {
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    attempts++;
+                }
+
+                if (!currentScenarioText || currentScenarioText.trim() === "") {
+                    throw new Error("Failed to read scenario data. It might be empty.");
+                }
+
+                container.innerText = currentScenarioText;
+                container.classList.remove('hidden');
+            } catch (err) {
+                logEvent(`Generation Failed: ${err.message}`, "error");
+                loader.innerText = "⚠️ Error. See system logs.";
+            } finally {
+                generateBtn.disabled = false;
+                loader.classList.add('hidden');
+            }
+        });
+
+        submitBtn.addEventListener('click', async () => {
+            const answers = document.getElementById('answersInput').value.trim();
+            if (!answers || !currentScenarioText) return alert("Please generate a scenario and type your strategy first!");
+
+            const loader = document.getElementById('verdictLoader');
+            const section = document.getElementById('verdictSection');
+
+            section.classList.remove('hidden');
+            loader.classList.remove('hidden');
+            document.getElementById('statusBadge').classList.add('hidden');
+            document.getElementById('verdictLog').classList.add('hidden');
+
+            loader.innerText = "⏳ Submitting answers to Studionet...";
+            logEvent("Submitting Answers...");
+
+            try {
+                const txHash = await client.writeContract({
+                    account: account,
+                    address: CONTRACT_ADDRESS,
+                    functionName: 'judge_survival',
+                    args: [currentScenarioText, answers],
+                    value: 0n
+                });
+
+                loader.innerText = "🧬 LLM is analyzing and judging your answers...";
+
+                const receipt = await client.waitForTransactionReceipt({
+                    hash: txHash,
+                    status: TransactionStatus.ACCEPTED,
+                    timeout: 600_000
+                });
+
+                if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
+                    throw new Error("Execution Reverted by Contract Logic.");
+                }
+
+                logEvent("Judgment complete! Fetching verdict...", "success");
+
+                let finalOutput = "";
+                let judgmentAttempts = 0;
+
+                while (judgmentAttempts < 10) {
+                    finalOutput = await client.readContract({
+                        address: CONTRACT_ADDRESS,
+                        functionName: 'get_judgment',
+                        args: [userAccountAddress],
+                        stateStatus: "accepted"
+                    });
+
+                    if (finalOutput && finalOutput.toString().trim() !== "") {
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    judgmentAttempts++;
+                }
+
+                let parsedVerdict;
+                try {
+                    parsedVerdict = typeof finalOutput === 'string' ? JSON.parse(finalOutput) : finalOutput;
+                } catch (e) {
+                    parsedVerdict = { status: "ERROR", explanation: finalOutput };
+                }
+
+                if (parsedVerdict && parsedVerdict.status) {
+                    renderResult(parsedVerdict.status, parsedVerdict.explanation);
+                } else {
+                    let outStr = JSON.stringify(finalOutput);
+                    renderResult(outStr.includes("SURVIVED") ? "SURVIVED" : "DIED", outStr);
+                }
+            } catch (err) {
+                logEvent(`Judgment Failed: ${err.message}`, "error");
+                loader.innerText = "⚠️ Error occurred. Check system logs.";
+            }
+        });
+
+        function renderResult(status, text) {
+            document.getElementById('verdictLoader').classList.add('hidden');
+            const badge = document.getElementById('statusBadge');
+            const log = document.getElementById('verdictLog');
+            const card = document.getElementById('verdictCard');
+
+            badge.classList.remove('hidden');
+            log.classList.remove('hidden');
+            badge.innerText = status;
+            log.innerText = text;
+
+            if (status === "SURVIVED") {
+                card.className = "bg-emerald-950/30 border border-emerald-500/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md";
+                badge.className = "text-4xl font-black tracking-tighter inline-block px-6 py-2 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else {
+                card.className = "bg-red-950/20 border border-red-500/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md";
+                badge.className = "text-4xl font-black tracking-tighter inline-block px-6 py-2 rounded-2xl bg-red-500/20 text-red-400 border border-red-500/30";
+            }
+        }
+    </script>
+</body>
+
+</html>
