@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mars Survival - GenLayer Studio Edition</title>
-    <link href="style.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
             background: radial-gradient(circle at center, #1e0b07 0%, #090302 100%);
@@ -23,8 +24,256 @@
             background: #555;
             border-radius: 4px;
         }
-    </style>
 
+        .orbit {
+            position: fixed;
+            right: -60px;
+            top: -20px;
+            width: 520px;
+            height: 520px;
+            border-radius: 50%;
+            animation: orbit 40s linear infinite;
+            pointer-events: none;
+            z-index: -2
+        }
+
+        .nebula {
+            position: fixed;
+            inset: 0;
+            z-index: -5;
+            pointer-events: none;
+            background: radial-gradient(circle at 20% 30%, rgba(255, 80, 40, .12), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(80, 120, 255, .10), transparent 25%),
+                radial-gradient(circle at 50% 80%, rgba(255, 255, 255, .05), transparent 20%)
+        }
+
+        .stars {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -4
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 4s infinite
+        }
+
+        @keyframes twinkle {
+            50% {
+                opacity: .2;
+            }
+        }
+
+        .stars-back,
+        .stars-mid,
+        .stars-front {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .stars-back {
+            z-index: -6;
+        }
+
+        .stars-mid {
+            z-index: -5;
+        }
+
+        .stars-front {
+            z-index: -4;
+        }
+
+        .star-back,
+        .star-mid,
+        .star-front {
+            position: absolute;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .star-back,
+        .star-mid,
+        .star-front {
+            position: absolute;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .star-back {
+            width: 1px;
+            height: 1px;
+        }
+
+        .star-mid {
+            width: 2px;
+            height: 2px;
+        }
+
+        .star-front {
+            width: 3px;
+            height: 3px;
+        }
+
+        @keyframes twinkle {
+
+            0% {
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.2;
+            }
+
+        }
+
+        .mars-glow {
+            position: fixed;
+            right: -40px;
+            top: -40px;
+            width: 620px;
+            height: 620px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -3;
+            background: radial-gradient(circle, rgba(255, 120, 40, .18) 0%, rgba(255, 120, 40, .08) 35%, transparent 75%);
+            filter: blur(45px);
+        }
+
+        section {
+            transition: transform .25s ease, box-shadow .25s ease;
+        }
+
+        section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(255, 120, 40, .08);
+        }
+
+
+        .footer-socials {
+
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+
+            gap: 18px;
+        }
+
+        .dock-icon {
+
+            width: 58px;
+            height: 58px;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            border-radius: 18px;
+
+            position: relative;
+
+            color: #9ca3af;
+
+            text-decoration: none;
+
+            transition:
+                transform .25s ease,
+                color .25s ease,
+                filter .25s ease;
+        }
+
+        .dock-icon i {
+
+            font-size: 30px;
+
+            transition:
+                transform .25s ease,
+                color .25s ease;
+        }
+
+        .dock-icon::before {
+
+            content: '';
+
+            position: absolute;
+
+            inset: 0;
+
+            border-radius: 18px;
+
+            opacity: 0;
+
+            transition: .25s ease;
+
+            z-index: -1;
+        }
+
+
+
+        .discord::before {
+            background: #5865F2;
+        }
+
+        .discord:hover {
+            color: #5865F2;
+        }
+
+        .discord:hover::before {
+            opacity: .15;
+        }
+
+
+
+        .github::before {
+            background: #ffffff;
+        }
+
+        .github:hover {
+            color: #ffffff;
+        }
+
+        .github:hover::before {
+            opacity: .12;
+        }
+
+
+
+        .x::before {
+            background: #ffffff;
+        }
+
+        .x:hover {
+            color: #ffffff;
+        }
+
+        .x:hover::before {
+            opacity: .12;
+        }
+
+
+
+        .footer-socials:hover .dock-icon {
+
+            transform: scale(.92);
+        }
+
+        .footer-socials .dock-icon:hover {
+
+            transform:
+                translateY(-16px) scale(1.28);
+
+            filter:
+                drop-shadow(0 0 18px rgba(255, 255, 255, .25));
+        }
+        
+    </style>
     <script type="importmap">
         {
             "imports": {
@@ -34,9 +283,31 @@
             }
         }
     </script>
+
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <style>
+        #spaceScene {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 520px;
+            height: 520px;
+            pointer-events: none;
+            z-index: -2;
+        }
+
+        .theme-switch {
+            background: #0f172a !important;
+        }
+    </style>
+    
 </head>
 
 <body class="text-gray-100 min-h-screen font-sans antialiased selection:bg-red-500 selection:text-white">
+    <div class="nebula"></div>
+    <div id="stars" class="stars"></div>
+    <div class="mars-glow"></div>
+    <div id="spaceScene"></div>
     <div class="max-w-4xl mx-auto px-4 py-8">
         <header
             class="flex flex-col sm:flex-row justify-between items-center border-b border-red-900/40 pb-6 mb-8 gap-4">
@@ -47,12 +318,19 @@
                 </h1>
                 <p class="text-xs text-gray-400 mt-1">Powered by GenLayer AI Consensus (Studionet)</p>
             </div>
+            <div class="ml-auto flex items-center gap-3">
+
+                <button id="connectBtn"
+                    class="bg-red-900/10 hover:bg-red-800 text-white px-4 py-2 rounded-xl border border-red-700 transition cursor-pointer flex items-center gap-2">
+                    <i class="fa-solid fa-wallet"></i><span>Connect Wallet</span>
+                </button>
+            </div>
         </header>
 
         <div id="walletInfo"
-            class="bg-black/40 border border-red-900/20 rounded-2xl p-4 mb-8 backdrop-blur-md flex flex-wrap gap-6 text-sm text-gray-300">
-            <div><span class="text-gray-500">Virtual Test Account:</span> <span id="userAddress"
-                    class="font-mono text-red-300 animate-pulse">Generating...</span></div>
+            class="hidden bg-black/40 border border-red-900/20 rounded-2xl p-4 mb-8 backdrop-blur-md flex flex-wrap gap-6 text-sm text-gray-300">
+            <div><span class="text-gray-500">Account:</span> <span id="userAddress" class="font-mono text-red-300">Not
+                    Connected</span></div>
         </div>
 
         <main class="space-y-8">
@@ -64,7 +342,7 @@
                         <h2 class="text-xl font-bold text-stone-200">Initiate Mission</h2>
                     </div>
                     <button id="generateBtn"
-                        class="bg-stone-800 hover:bg-stone-700 text-stone-300 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-xl border border-stone-700 transition cursor-pointer"
+                        class="bg-gradient-to-r from-stone-800 to-stone-900 hover:from-red-950 hover:to-red-900 text-stone-400 hover:text-red-200 disabled:opacity-40 font-bold px-6 py-3 rounded-xl border border-stone-700 hover:border-red-800/2 shadow-md transition-all cursor-pointer"
                         disabled>
                         Generate Scenario
                     </button>
@@ -118,18 +396,44 @@
         </main>
     </div>
 
-    <script type="module">
-        import { createClient, createAccount } from "genlayer-js";
-        import { studionet } from "genlayer-js/chains";
-        import { TransactionStatus, ExecutionResult } from "genlayer-js/types";
 
-        const CONTRACT_ADDRESS = "0xAA05339f1F3476a29d273e5392D72bb03432f32a";
+    <footer class="mt-12 border-t border-red-900/30 py-8 text-center">
+
+        <div class="footer-socials">
+
+            <a href="https://github.com/genlayerlabs" target="_blank" class="dock-icon github">
+
+                <i class="fab fa-github"></i>
+
+            </a>
+
+            <a href="https://discord.com/invite/8Jm4v89VAu" target="_blank" class="dock-icon discord">
+
+                <i class="fab fa-discord"></i>
+
+            </a>
+
+            <a href="https://x.com/genlayer" target="_blank" class="dock-icon x">
+
+                <i class="fab fa-x-twitter"></i>
+
+            </a>
+
+        </div>
+
+    </footer>
+    <script type="module">
+        import { createClient } from "genlayer-js";
+        import { studionet } from "genlayer-js/chains";
+        import { TransactionStatus } from "genlayer-js/types";
+
+        const CONTRACT_ADDRESS = "0x12d53a6401f9c92194f91331c7F3357761d15495";
 
         let client = null;
-        let account = null;
         let userAccountAddress = null;
         let currentScenarioText = "";
 
+        const connectBtn = document.getElementById('connectBtn');
         const generateBtn = document.getElementById('generateBtn');
         const submitBtn = document.getElementById('submitBtn');
         const debugLog = document.getElementById('debugLog');
@@ -144,35 +448,37 @@
             debugLog.scrollTop = debugLog.scrollHeight;
         }
 
-        async function initStudioClient() {
-            try {
-                logEvent("Initializing Studionet Client...");
-                account = createAccount();
-                userAccountAddress = account.address;
+        connectBtn.addEventListener('click', async () => {
+            if (client) {
+                client = null;
+                userAccountAddress = null;
+                connectBtn.innerText = "Connect Wallet";
+                document.getElementById('walletInfo').classList.add('hidden');
+                generateBtn.disabled = true;
+                submitBtn.disabled = true;
+                logEvent("Wallet Disconnected", "warning");
+                return;
+            }
 
-                client = createClient({
-                    chain: studionet,
-                    account: account
-                });
+            const provider = window.ethereum || window.genlayer;
+            if (!provider) return logEvent("No wallet found!", "error");
+
+            try {
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                userAccountAddress = accounts[0];
+                client = createClient({ chain: studionet, account: userAccountAddress, provider });
 
                 document.getElementById('userAddress').innerText = userAccountAddress;
-                document.getElementById('userAddress').classList.remove('animate-pulse');
-
-                if (CONTRACT_ADDRESS === "آدرس_جدید_شما_پس_از_دیپلوی_مجدد") {
-                    logEvent("WARNING: Please set CONTRACT_ADDRESS in the code!", "error");
-                } else {
-                    generateBtn.removeAttribute('disabled');
-                    submitBtn.removeAttribute('disabled');
-                    logEvent(`Virtual Account Created: ${userAccountAddress}`, "success");
-                    logEvent(`Connected to Studionet successfully!`, "success");
-                }
+                document.getElementById('walletInfo').classList.remove('hidden');
+                connectBtn.innerText = "Disconnect";
+                generateBtn.removeAttribute('disabled');
+                submitBtn.removeAttribute('disabled');
+                logEvent(`Connected: ${userAccountAddress.substring(0, 6)}...`, "success");
             } catch (err) {
-                logEvent(`Initialization failed: ${err.message}`, "error");
+                logEvent(`Connection Failed: ${err.message}`, "error");
             }
-        }
-
-        initStudioClient();
-
+        });
+        //alert("Sending to Contract: " + CONTRACT_ADDRESS);
         generateBtn.addEventListener('click', async () => {
             const loader = document.getElementById('scenarioLoader');
             const container = document.getElementById('scenarioContainer');
@@ -181,61 +487,32 @@
             container.classList.add('hidden');
             generateBtn.disabled = true;
 
-            loader.innerText = "⏳ Sending transaction to Studionet...";
+            loader.innerText = "⏳ Sending transaction...";
             logEvent("Invoking generate_scenario...");
 
             try {
                 const txHash = await client.writeContract({
-                    account: account,
                     address: CONTRACT_ADDRESS,
-                    functionName: 'generate_scenario',
-                    args: [],
-                    value: 0n
+                    functionName: 'generate_scenario'
                 });
 
-                loader.innerText = "⏳ Tx Sent! LLM is generating your scenario...";
+                loader.innerText = "⏳ Tx Sent! Waiting for consensus...";
                 logEvent(`Tx Hash: ${txHash}`);
 
-                const receipt = await client.waitForTransactionReceipt({
-                    hash: txHash,
-                    status: TransactionStatus.ACCEPTED,
-                    timeout: 600_000
+                await client.waitForTransactionReceipt({ hash: txHash, status: TransactionStatus.ACCEPTED, timeout: 1_200_000 });
+
+                logEvent("Scenario generated! Fetching...", "success");
+                currentScenarioText = await client.readContract({
+                    address: CONTRACT_ADDRESS,
+                    functionName: 'get_scenario',
+                    args: [userAccountAddress],
+                    stateStatus: "accepted"
                 });
-
-                if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
-                    throw new Error("Contract execution failed. Check GenLayer Studio logs.");
-                }
-
-                logEvent("Scenario generated! Fetching text from chain...", "success");
-                loader.innerText = "⏳ Reading scenario from blockchain...";
-
-                let attempts = 0;
-                currentScenarioText = "";
-
-                while (attempts < 10) {
-                    currentScenarioText = await client.readContract({
-                        address: CONTRACT_ADDRESS,
-                        functionName: 'get_scenario',
-                        args: [userAccountAddress],
-                        stateStatus: "accepted"
-                    });
-
-                    if (currentScenarioText && currentScenarioText.trim() !== "") {
-                        break;
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    attempts++;
-                }
-
-                if (!currentScenarioText || currentScenarioText.trim() === "") {
-                    throw new Error("Failed to read scenario data. It might be empty.");
-                }
 
                 container.innerText = currentScenarioText;
                 container.classList.remove('hidden');
             } catch (err) {
                 logEvent(`Generation Failed: ${err.message}`, "error");
-                loader.innerText = "⚠️ Error. See system logs.";
             } finally {
                 generateBtn.disabled = false;
                 loader.classList.add('hidden');
@@ -244,76 +521,62 @@
 
         submitBtn.addEventListener('click', async () => {
             const answers = document.getElementById('answersInput').value.trim();
-            if (!answers || !currentScenarioText) return alert("Please generate a scenario and type your strategy first!");
+            if (!answers) return logEvent("Please type your strategy!", "warning");
 
             const loader = document.getElementById('verdictLoader');
             const section = document.getElementById('verdictSection');
+            const badge = document.getElementById('statusBadge');
+            const log = document.getElementById('verdictLog');
+
 
             section.classList.remove('hidden');
             loader.classList.remove('hidden');
-            document.getElementById('statusBadge').classList.add('hidden');
-            document.getElementById('verdictLog').classList.add('hidden');
+            badge.classList.add('hidden');
+            log.classList.add('hidden');
 
-            loader.innerText = "⏳ Submitting answers to Studionet...";
+            loader.innerText = "⏳ Submitting answers to blockchain...";
             logEvent("Submitting Answers...");
 
             try {
                 const txHash = await client.writeContract({
-                    account: account,
                     address: CONTRACT_ADDRESS,
                     functionName: 'judge_survival',
-                    args: [currentScenarioText, answers],
-                    value: 0n
+                    args: [currentScenarioText, answers]
                 });
 
                 loader.innerText = "🧬 LLM is analyzing and judging your answers...";
+                logEvent(`Tx Hash: ${txHash}`);
 
-                const receipt = await client.waitForTransactionReceipt({
-                    hash: txHash,
-                    status: TransactionStatus.ACCEPTED,
-                    timeout: 600_000
+                await client.waitForTransactionReceipt({ hash: txHash, status: TransactionStatus.ACCEPTED, timeout: 1_200_000 });
+
+                logEvent("Fetching judgment results...", "success");
+                const res = await client.readContract({
+                    address: CONTRACT_ADDRESS,
+                    functionName: 'get_judgment',
+                    args: [userAccountAddress],
+                    stateStatus: "accepted"
                 });
 
-                if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
-                    throw new Error("Execution Reverted by Contract Logic.");
-                }
+                let finalStatus = "DIED";
+                let finalExplanation = res.toString();
 
-                logEvent("Judgment complete! Fetching verdict...", "success");
-
-                let finalOutput = "";
-                let judgmentAttempts = 0;
-
-                while (judgmentAttempts < 10) {
-                    finalOutput = await client.readContract({
-                        address: CONTRACT_ADDRESS,
-                        functionName: 'get_judgment',
-                        args: [userAccountAddress],
-                        stateStatus: "accepted"
-                    });
-
-                    if (finalOutput && finalOutput.toString().trim() !== "") {
-                        break;
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    judgmentAttempts++;
-                }
-
-                let parsedVerdict;
                 try {
-                    parsedVerdict = typeof finalOutput === 'string' ? JSON.parse(finalOutput) : finalOutput;
+                    const parsed = typeof res === 'string' ? JSON.parse(res) : res;
+                    if (parsed.status && parsed.explanation) {
+                        finalStatus = parsed.status;
+                        finalExplanation = parsed.explanation;
+                    } else if (res.toString().includes("SURVIVED")) {
+                        finalStatus = "SURVIVED";
+                    }
                 } catch (e) {
-                    parsedVerdict = { status: "ERROR", explanation: finalOutput };
+                    if (res.toString().includes("SURVIVED")) finalStatus = "SURVIVED";
                 }
 
-                if (parsedVerdict && parsedVerdict.status) {
-                    renderResult(parsedVerdict.status, parsedVerdict.explanation);
-                } else {
-                    let outStr = JSON.stringify(finalOutput);
-                    renderResult(outStr.includes("SURVIVED") ? "SURVIVED" : "DIED", outStr);
-                }
+                renderResult(finalStatus, finalExplanation);
+
             } catch (err) {
                 logEvent(`Judgment Failed: ${err.message}`, "error");
-                loader.innerText = "⚠️ Error occurred. Check system logs.";
+                loader.innerText = "⚠️ Error occurred during judgment.";
             }
         });
 
@@ -336,7 +599,134 @@
                 badge.className = "text-4xl font-black tracking-tighter inline-block px-6 py-2 rounded-2xl bg-red-500/20 text-red-400 border border-red-500/30";
             }
         }
+        createLayer('stars-back', 180, 'star-back');
+        createLayer('stars-mid', 120, 'star-mid');
+        createLayer('stars-front', 80, 'star-front');
+
+        function createLayer(className, count, starClass) {
+
+            const layer = document.createElement('div');
+            layer.className = className;
+
+            for (let i = 0; i < count; i++) {
+
+                const star = document.createElement('div');
+                star.className = starClass;
+
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                const duration = 2 + Math.random() * 6;
+
+                const delay = Math.random() * 10;
+
+                star.style.animation =
+                    `twinkle ${duration}s infinite`;
+
+                star.style.animationDelay =
+                    `${delay}s`;
+                layer.appendChild(star);
+            }
+
+            document.body.appendChild(layer);
+        }
+
+
+        // ===== THREE JS MARS (Full 360 Rotation & Orbit with Lights) =====
+        (function () {
+            const host = document.getElementById('spaceScene');
+            if (!host || typeof THREE === 'undefined') return;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(520, 520);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            host.appendChild(renderer.domElement);
+
+            camera.position.z = 4.1;
+
+
+
+            const textureLoader = new THREE.TextureLoader();
+
+
+            const marsTexture = textureLoader.load('/images/mars.jpg');
+            marsTexture.colorSpace = THREE.SRGBColorSpace;
+
+            const qamarTexture = textureLoader.load('/images/qamar.jpg');
+            qamarTexture.colorSpace = THREE.SRGBColorSpace;
+
+
+            const marsGeo = new THREE.SphereGeometry(1.3, 64, 64);
+            const marsMat = new THREE.MeshBasicMaterial({
+                map: marsTexture
+            });
+            const mars = new THREE.Mesh(marsGeo, marsMat);
+            scene.add(mars);
+
+
+            const moonGeo = new THREE.SphereGeometry(0.26, 32, 32);
+            const moonMat = new THREE.MeshBasicMaterial({
+                map: qamarTexture
+            });
+            const moon = new THREE.Mesh(moonGeo, moonMat);
+            scene.add(moon);
+
+            let t = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                t += 0.015;
+
+
+                mars.rotation.y = t * 0.2;
+
+
+                moon.rotation.y += 0.015;
+
+
+                const orbitSpeed = t * 0.12;
+                moon.position.x = Math.cos(orbitSpeed) * 1.8;
+                moon.position.z = Math.sin(orbitSpeed) * 1.8;
+                moon.position.y = Math.sin(orbitSpeed * 0.5) * 0.3;
+
+                renderer.render(scene, camera);
+            }
+            animate();
+        })();
+        const dockIcons =
+            document.querySelectorAll('.dock-icon');
+
+        dockIcons.forEach((icon, index) => {
+
+            icon.addEventListener('mouseenter', () => {
+
+                if (dockIcons[index - 1]) {
+
+                    dockIcons[index - 1].style.transform =
+                        'translateY(-6px) scale(1.08)';
+                }
+
+                if (dockIcons[index + 1]) {
+
+                    dockIcons[index + 1].style.transform =
+                        'translateY(-6px) scale(1.08)';
+                }
+            });
+
+            icon.addEventListener('mouseleave', () => {
+
+                dockIcons.forEach(item => {
+
+                    item.style.transform = '';
+
+                });
+
+            });
+
+        });
     </script>
+
 </body>
 
 </html>

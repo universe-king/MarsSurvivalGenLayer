@@ -1,31 +1,17 @@
 {
-  "scripts": {
-    "dev": "npx tailwindcss -i ./input.css -o ./style.css --watch"
-  },
-  "name": "mars",
+  "name": "mars-survival",
   "version": "1.0.0",
-  "description": "",
-  "main": "tailwind.config.js",
-  "dependencies": {
-    "baseline-browser-mapping": "^2.10.33",
-    "browserslist": "^4.28.2",
-    "caniuse-lite": "^1.0.30001793",
-    "electron-to-chromium": "^1.5.367",
-    "escalade": "^3.2.0",
-    "fraction.js": "^5.3.4",
-    "nanoid": "^3.3.12",
-    "node-releases": "^2.0.47",
-    "picocolors": "^1.1.1",
-    "postcss-value-parser": "^4.2.0",
-    "source-map-js": "^1.2.1",
-    "update-browserslist-db": "^1.2.3"
+  "scripts": {
+    "dev": "vite"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "dependencies": {
+    "genlayer-js": "^1.1.8",
+    "viem": "^2.52.2"
+  },
   "devDependencies": {
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.15",
-    "tailwindcss": "^3.4.19"
+    "tailwindcss": "^3.4.19",
+    "vite": "^8.0.16"
   }
 }
