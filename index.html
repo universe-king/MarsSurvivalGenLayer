@@ -421,6 +421,18 @@
         </div>
 
     </footer>
+    <script>
+        window.__earlyEIP6963Providers = window.__earlyEIP6963Providers || new Map();
+        window.addEventListener("eip6963:announceProvider", event => {
+            try {
+                const detail = event?.detail;
+                if (!detail?.provider || !detail?.info) return;
+                const key = detail.info.uuid || detail.info.rdns || detail.info.name;
+                if (key) window.__earlyEIP6963Providers.set(key, detail);
+            } catch (e) { console.debug("Early EIP-6963 capture failed:", e); }
+        }, false);
+        window.dispatchEvent(new Event("eip6963:requestProvider"));
+    </script>
     <script type="module">
         import { createClient } from "genlayer-js";
         import { studionet } from "genlayer-js/chains";
@@ -456,6 +468,12 @@
         // Keep the complete EIP-6963 detail object, not just the provider.
         // This is important because wallet identity can live in `info.rdns`.
         const discoveredProviders = new Map();
+
+        try {
+            for (const [key, detail] of (window.__earlyEIP6963Providers || new Map())) {
+                if (detail?.provider && detail?.info) discoveredProviders.set(key, { info: detail.info, provider: detail.provider });
+            }
+        } catch (e) { console.debug("Could not import early EIP-6963 providers:", e); }
 
         function normalize(value) {
             return String(value ?? "").trim().toLowerCase();
@@ -564,40 +582,70 @@
         }
 
         async function discoverWallets() {
-            // Ask all EIP-6963 wallets to announce themselves.
-            requestWallets();
+            const deadline = Date.now() + 3500;
+            while (Date.now() < deadline) {
+                requestWallets();
 
-            // Give extensions enough time to answer. This is intentionally
-            // longer than the previous 700ms to make local development more reliable.
-            await new Promise(resolve => setTimeout(resolve, 1200));
+                for (const provider of [window.zerionWallet, window.zerion, window.zerionProvider]) {
+                    if (provider && typeof provider.request === "function") {
+                        addLegacyWallet([], provider, { name: "Zerion", rdns: "io.zerion.wallet" });
+                    }
+                }
+
+                if (
+                    discoveredProviders.size > 0 ||
+                    typeof window.ethereum !== "undefined" ||
+                    window.zerionWallet || window.zerion || window.zerionProvider
+                ) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 400));
+            }
 
             const wallets = [...discoveredProviders.values()];
 
-            // Some wallets expose multiple providers through window.ethereum.providers.
             if (Array.isArray(window.ethereum?.providers)) {
                 for (const provider of window.ethereum.providers) {
-                    addLegacyWallet(wallets, provider);
+                    addLegacyWallet(wallets, provider, { name: getWalletName({}, provider) });
                 }
             }
 
-            // Zerion may expose its provider directly in some extension versions.
-            // Prefer it as a distinct provider rather than guessing from window.ethereum.
-            if (window.zerionWallet) {
-                addLegacyWallet(wallets, window.zerionWallet, {
-                    name: "Zerion",
-                    rdns: "io.zerion.wallet"
+            const zerionCandidates = [
+                ["zerionWallet", window.zerionWallet],
+                ["zerion", window.zerion],
+                ["zerionProvider", window.zerionProvider]
+            ];
+
+            for (const [globalName, provider] of zerionCandidates) {
+                if (provider && typeof provider.request === "function") {
+                    addLegacyWallet(wallets, provider, { name: "Zerion", rdns: "io.zerion.wallet" });
+                    logEvent(`Found Zerion provider via window.${globalName}.`, "success");
+                }
+            }
+
+            // Keep the legacy window.ethereum provider only when it adds a wallet
+            // that EIP-6963 did not already expose. Otherwise wallets such as Rabby
+            // can appear twice: once as its real EIP-6963 provider and once as the
+            // generic "Injected wallet provider".
+            if (window.ethereum && typeof window.ethereum.request === "function") {
+                const legacyName = getWalletName({}, window.ethereum);
+                const alreadyKnown = wallets.some(w => {
+                    const name = getWalletName(w.info, w.provider);
+                    return name === legacyName &&
+                        normalize(w.info?.rdns) &&
+                        w.provider !== window.ethereum;
                 });
+
+                if (!alreadyKnown) {
+                    addLegacyWallet(wallets, window.ethereum, { name: legacyName });
+                }
             }
 
-            // Legacy single-provider fallback.
-            if (window.ethereum) {
-                addLegacyWallet(wallets, window.ethereum);
-            }
-
-            // Remove duplicate provider objects while preserving metadata.
             const unique = [];
             const seenProviders = new Set();
             const seenWalletIds = new Set();
+            const seenWalletNames = new Set();
 
             for (const wallet of wallets) {
                 if (!isEip6963Wallet(wallet)) continue;
@@ -605,19 +653,32 @@
                 const provider = wallet.provider;
                 const uuid = normalize(wallet.info?.uuid);
                 const rdns = normalize(wallet.info?.rdns);
+                const walletName = normalize(getWalletName(wallet.info, provider));
+                const hasEip6963Identity = Boolean(uuid || rdns);
 
                 if (seenProviders.has(provider)) continue;
 
-                // If the same wallet announced twice with the same identity,
-                // keep the first object.
                 const identity = uuid || (rdns && rdns !== "unknown" ? rdns : "");
                 if (identity && seenWalletIds.has(identity)) continue;
 
+                // If EIP-6963 already supplied a proper named wallet, suppress a
+                // duplicate legacy/injected entry with the same wallet name.
+                if (!hasEip6963Identity && seenWalletNames.has(walletName)) continue;
+
                 seenProviders.add(provider);
                 if (identity) seenWalletIds.add(identity);
+                if (walletName && walletName !== "unknown wallet") seenWalletNames.add(walletName);
                 unique.push(wallet);
             }
 
+            logEvent(
+                `Wallet scan: EIP-6963=${discoveredProviders.size}, ` +
+                `window.ethereum=${window.ethereum ? "YES" : "NO"}, ` +
+                `ethereum.providers=${Array.isArray(window.ethereum?.providers) ? window.ethereum.providers.length : 0}, ` +
+                `Zerion globals=${[window.zerionWallet, window.zerion, window.zerionProvider].filter(p => p && typeof p.request === "function").length}, ` +
+                `total=${unique.length}`,
+                unique.length ? "success" : "error"
+            );
             return unique;
         }
 
@@ -954,9 +1015,16 @@
                 const wallets = await discoverWallets();
 
                 if (!wallets.length) {
+                    logEvent(`No injected wallet provider found on ${window.location.origin}.`, "error");
                     logEvent(
-                        "No Web3 wallet detected. Make sure your wallet extension is installed and enabled.",
-                        "error"
+                        "Zerion must be installed as the browser extension and allowed to access this site. " +
+                        "In Chrome: Extensions → Zerion → Site access → On all sites (or allow 127.0.0.1), then reload.",
+                        "warning"
+                    );
+                    logEvent(
+                        "Diagnostic: window.ethereum=" + (window.ethereum ? "YES" : "NO") +
+                        ", origin=" + window.location.origin,
+                        "warning"
                     );
                     return;
                 }
