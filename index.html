@@ -447,42 +447,587 @@
             debugLog.scrollTop = debugLog.scrollHeight;
         }
 
-        connectBtn.addEventListener('click', async () => {
-            if (client) {
-                client = null;
-                userAccountAddress = null;
-                connectBtn.innerText = "Connect Wallet";
-                document.getElementById('walletInfo').classList.add('hidden');
-                generateBtn.disabled = true;
-                submitBtn.disabled = true;
-                logEvent("Wallet Disconnected", "warning");
+        // ============================================================
+        // MULTI WALLET SUPPORT
+        // MetaMask + OKX + Rabby + Zerion
+        // EIP-6963 + legacy injected-provider support
+        // ============================================================
+
+        // Keep the complete EIP-6963 detail object, not just the provider.
+        // This is important because wallet identity can live in `info.rdns`.
+        const discoveredProviders = new Map();
+
+        function normalize(value) {
+            return String(value ?? "").trim().toLowerCase();
+        }
+
+        function isEip6963Wallet(wallet) {
+            return !!(wallet && wallet.provider && wallet.info);
+        }
+
+        function isZerionProvider(info = {}, provider = null) {
+            const name = normalize(info?.name);
+            const rdns = normalize(info?.rdns);
+
+            // Zerion's common injected-provider identity is isZerion.
+            // Also accept the EIP-6963 reverse-DNS identity and name.
+            return !!(
+                provider?.isZerion === true ||
+                provider?.isZerionWallet === true ||
+                rdns === "io.zerion.wallet" ||
+                rdns.includes("zerion") ||
+                name === "zerion" ||
+                name.includes("zerion")
+            );
+        }
+
+        function getWalletName(info = {}, provider = null) {
+            const name = normalize(info?.name);
+            const rdns = normalize(info?.rdns);
+            const icon = normalize(info?.icon);
+
+            if (isZerionProvider(info, provider)) return "Zerion";
+            if (provider?.isRabby || name.includes("rabby") || rdns.includes("rabby")) return "Rabby";
+            if (
+                provider?.isOkxWallet ||
+                provider?.isOKExWallet ||
+                name.includes("okx") ||
+                rdns.includes("okx")
+            ) return "OKX";
+            if (provider?.isMetaMask || name.includes("metamask") || rdns.includes("metamask")) return "MetaMask";
+
+            // `icon` is intentionally not normally used for detection, but
+            // it is included here so custom wallet naming still remains visible.
+            void icon;
+            return info?.name || "Unknown Wallet";
+        }
+
+        function registerWallet(event) {
+            try {
+                const detail = event?.detail || {};
+                const info = detail.info || {};
+                const provider = detail.provider;
+
+                if (!provider || typeof provider.request !== "function") return;
+
+                const wallet = {
+                    info: {
+                        uuid: info.uuid || "",
+                        name: info.name || "",
+                        icon: info.icon || "",
+                        rdns: info.rdns || ""
+                    },
+                    provider
+                };
+
+                // Prefer UUID when present. It is the stable EIP-6963 identity
+                // for the provider session. RDNS is useful as a secondary key.
+                const key =
+                    info.uuid ||
+                    info.rdns ||
+                    `${info.name || "unknown"}-${Math.random().toString(36).slice(2)}`;
+
+                discoveredProviders.set(key, wallet);
+
+                logEvent(
+                    `Wallet discovered: ${getWalletName(wallet.info, wallet.provider)}` +
+                    (info.rdns ? ` [${info.rdns}]` : ""),
+                    "info"
+                );
+            } catch (err) {
+                console.warn("EIP-6963 registration error:", err);
+            }
+        }
+
+        // IMPORTANT: register the listener before requesting providers.
+        window.addEventListener("eip6963:announceProvider", registerWallet, false);
+
+        function requestWallets() {
+            // Wallets that loaded before this page are required by EIP-6963
+            // to announce themselves again when this request is dispatched.
+            window.dispatchEvent(new Event("eip6963:requestProvider"));
+        }
+
+        function addLegacyWallet(wallets, provider, info = {}) {
+            if (!provider || typeof provider.request !== "function") return;
+            if (wallets.some(w => w.provider === provider)) return;
+
+            wallets.push({
+                info: {
+                    uuid: info.uuid || "",
+                    name: info.name || getWalletName(info, provider),
+                    icon: info.icon || "",
+                    rdns: info.rdns || ""
+                },
+                provider
+            });
+        }
+
+        async function discoverWallets() {
+            // Ask all EIP-6963 wallets to announce themselves.
+            requestWallets();
+
+            // Give extensions enough time to answer. This is intentionally
+            // longer than the previous 700ms to make local development more reliable.
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            const wallets = [...discoveredProviders.values()];
+
+            // Some wallets expose multiple providers through window.ethereum.providers.
+            if (Array.isArray(window.ethereum?.providers)) {
+                for (const provider of window.ethereum.providers) {
+                    addLegacyWallet(wallets, provider);
+                }
+            }
+
+            // Zerion may expose its provider directly in some extension versions.
+            // Prefer it as a distinct provider rather than guessing from window.ethereum.
+            if (window.zerionWallet) {
+                addLegacyWallet(wallets, window.zerionWallet, {
+                    name: "Zerion",
+                    rdns: "io.zerion.wallet"
+                });
+            }
+
+            // Legacy single-provider fallback.
+            if (window.ethereum) {
+                addLegacyWallet(wallets, window.ethereum);
+            }
+
+            // Remove duplicate provider objects while preserving metadata.
+            const unique = [];
+            const seenProviders = new Set();
+            const seenWalletIds = new Set();
+
+            for (const wallet of wallets) {
+                if (!isEip6963Wallet(wallet)) continue;
+
+                const provider = wallet.provider;
+                const uuid = normalize(wallet.info?.uuid);
+                const rdns = normalize(wallet.info?.rdns);
+
+                if (seenProviders.has(provider)) continue;
+
+                // If the same wallet announced twice with the same identity,
+                // keep the first object.
+                const identity = uuid || (rdns && rdns !== "unknown" ? rdns : "");
+                if (identity && seenWalletIds.has(identity)) continue;
+
+                seenProviders.add(provider);
+                if (identity) seenWalletIds.add(identity);
+                unique.push(wallet);
+            }
+
+            return unique;
+        }
+
+        function walletIcon(info, provider) {
+            const fallback = getWalletName(info, provider);
+            if (info?.icon && typeof info.icon === "string") return info.icon;
+
+            // Small inline SVG placeholders for legacy providers without EIP-6963 icons.
+            const svg =
+                `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">` +
+                `<rect width="48" height="48" rx="12" fill="#222"/>` +
+                `<text x="24" y="30" text-anchor="middle" font-size="18" fill="#fff" font-family="Arial">` +
+                `${fallback.charAt(0).toUpperCase()}</text></svg>`;
+            return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+        }
+
+        function showWalletSelector(wallets) {
+            return new Promise(resolve => {
+                const oldModal = document.getElementById("walletSelectorModal");
+                if (oldModal) oldModal.remove();
+
+                const modal = document.createElement("div");
+                modal.id = "walletSelectorModal";
+                modal.style.cssText = `
+                    position: fixed;
+                    inset: 0;
+                    z-index: 99999;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(0,0,0,.78);
+                    backdrop-filter: blur(8px);
+                `;
+
+                const box = document.createElement("div");
+                box.style.cssText = `
+                    width: min(420px, calc(100% - 32px));
+                    max-height: min(80vh, 620px);
+                    overflow-y: auto;
+                    background: #111;
+                    border: 1px solid rgba(255,80,40,.35);
+                    border-radius: 20px;
+                    padding: 24px;
+                    box-shadow: 0 25px 80px rgba(0,0,0,.65);
+                `;
+
+                const title = document.createElement("h2");
+                title.innerText = "Connect Wallet";
+                title.style.cssText = `
+                    color: white;
+                    font-size: 22px;
+                    font-weight: 800;
+                    margin-bottom: 8px;
+                    text-align: center;
+                `;
+                box.appendChild(title);
+
+                const subtitle = document.createElement("p");
+                subtitle.innerText = "Select a wallet to continue";
+                subtitle.style.cssText = `
+                    color: #777;
+                    font-size: 13px;
+                    margin-bottom: 18px;
+                    text-align: center;
+                `;
+                box.appendChild(subtitle);
+
+                wallets.forEach(wallet => {
+                    const provider = wallet.provider;
+                    const walletName = getWalletName(wallet.info, provider);
+
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.style.cssText = `
+                        width: 100%;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 12px 14px;
+                        margin-bottom: 10px;
+                        border-radius: 12px;
+                        border: 1px solid #333;
+                        background: #181818;
+                        color: white;
+                        font-weight: 700;
+                        text-align: left;
+                        cursor: pointer;
+                        transition: .2s;
+                    `;
+
+                    const img = document.createElement("img");
+                    img.src = walletIcon(wallet.info, provider);
+                    img.alt = "";
+                    img.width = 40;
+                    img.height = 40;
+                    img.style.cssText = "width:40px;height:40px;border-radius:10px;object-fit:cover;background:#222;";
+
+                    const textWrap = document.createElement("div");
+                    textWrap.style.cssText = "display:flex;flex-direction:column;min-width:0;";
+
+                    const nameEl = document.createElement("span");
+                    nameEl.innerText = walletName;
+                    nameEl.style.cssText = "font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+
+                    const metaEl = document.createElement("span");
+                    metaEl.innerText = wallet.info?.rdns || "Injected wallet provider";
+                    metaEl.style.cssText = "font-size:11px;color:#777;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+
+                    textWrap.appendChild(nameEl);
+                    textWrap.appendChild(metaEl);
+                    button.appendChild(img);
+                    button.appendChild(textWrap);
+
+                    button.addEventListener("mouseenter", () => {
+                        button.style.background = "#2a2a2a";
+                        button.style.borderColor = "#ef4444";
+                    });
+
+                    button.addEventListener("mouseleave", () => {
+                        button.style.background = "#181818";
+                        button.style.borderColor = "#333";
+                    });
+
+                    button.addEventListener("click", () => {
+                        modal.remove();
+                        resolve(wallet); // Preserve BOTH info and provider.
+                    });
+
+                    box.appendChild(button);
+                });
+
+                const cancel = document.createElement("button");
+                cancel.type = "button";
+                cancel.innerText = "Cancel";
+                cancel.style.cssText = `
+                    width: 100%;
+                    margin-top: 6px;
+                    padding: 11px;
+                    border: none;
+                    background: transparent;
+                    color: #777;
+                    cursor: pointer;
+                `;
+
+                cancel.onclick = () => {
+                    modal.remove();
+                    resolve(null);
+                };
+
+                box.appendChild(cancel);
+                modal.appendChild(box);
+                document.body.appendChild(modal);
+
+                modal.addEventListener("click", event => {
+                    if (event.target === modal) {
+                        modal.remove();
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
+        // ============================================================
+        // ENSURE CORRECT GENLAYER NETWORK
+        // ============================================================
+
+        async function ensureCorrectChain(provider) {
+            const targetChainId = "0x" + studionet.id.toString(16);
+
+            if (!provider || typeof provider.request !== "function") {
+                throw new Error("Selected wallet provider is invalid or unavailable.");
+            }
+
+            const getChainId = () => provider.request({ method: "eth_chainId" });
+
+            let currentChainId = await getChainId();
+
+            if (String(currentChainId).toLowerCase() === targetChainId.toLowerCase()) {
+                logEvent(`Wallet already on ${studionet.name}.`, "success");
                 return;
             }
 
-            const provider = window.ethereum || window.genlayer;
-            if (!provider) return logEvent("No wallet found!", "error");
+            logEvent(
+                `Switching wallet from ${currentChainId} to ${targetChainId}...`,
+                "warning"
+            );
 
             try {
-                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                await provider.request({
+                    method: "wallet_switchEthereumChain",
+                    params: [{ chainId: targetChainId }]
+                });
+            } catch (switchError) {
+                console.warn("wallet_switchEthereumChain error:", switchError);
+
+                const message = String(switchError?.message || "").toLowerCase();
+                const code = switchError?.code;
+                const originalCode = switchError?.data?.originalError?.code;
+
+                const chainNotAdded =
+                    code === 4902 ||
+                    originalCode === 4902 ||
+                    message.includes("unrecognized chain") ||
+                    message.includes("chain not added") ||
+                    message.includes("has not been added");
+
+                if (!chainNotAdded) throw switchError;
+
+                logEvent(
+                    "GenLayer network is not installed. Requesting wallet to add it...",
+                    "warning"
+                );
+
+                await provider.request({
+                    method: "wallet_addEthereumChain",
+                    params: [{
+                        chainId: targetChainId,
+                        chainName: studionet.name,
+                        nativeCurrency: studionet.nativeCurrency,
+                        rpcUrls: studionet.rpcUrls.default.http,
+                        blockExplorerUrls:
+                            studionet.blockExplorers?.default?.url
+                                ? [studionet.blockExplorers.default.url]
+                                : []
+                    }]
+                });
+
+                // Some wallets add the chain without automatically switching.
+                await provider.request({
+                    method: "wallet_switchEthereumChain",
+                    params: [{ chainId: targetChainId }]
+                });
+            }
+
+            currentChainId = await getChainId();
+
+            if (String(currentChainId).toLowerCase() !== targetChainId.toLowerCase()) {
+                throw new Error(
+                    `Wallet is still on ${currentChainId}. ` +
+                    `Expected ${targetChainId} (${studionet.name}).`
+                );
+            }
+
+            logEvent(
+                `Wallet confirmed on ${studionet.name}.`,
+                "success"
+            );
+        }
+
+        // ============================================================
+        // CONNECT WALLET
+        // ============================================================
+
+        // Keep the selected wallet detail so account/chain listeners are attached
+        // to the exact provider the user chose (especially important with Zerion).
+        let selectedWalletDetail = null;
+        let providerEventHandlersAttached = false;
+
+        function resetConnectedUI(message = "Wallet disconnected.") {
+            client = null;
+            userAccountAddress = null;
+            selectedWalletDetail = null;
+            providerEventHandlersAttached = false;
+
+            connectBtn.innerHTML =
+                '<i class="fa-solid fa-wallet"></i><span>Connect Wallet</span>';
+
+            document.getElementById("walletInfo").classList.add("hidden");
+            generateBtn.disabled = true;
+            submitBtn.disabled = true;
+
+            logEvent(message, "warning");
+        }
+
+        function attachProviderListeners(provider) {
+            if (!provider?.on || providerEventHandlersAttached) return;
+            providerEventHandlersAttached = true;
+
+            provider.on("accountsChanged", accounts => {
+                if (!accounts || !accounts.length) {
+                    resetConnectedUI("Wallet account disconnected.");
+                    return;
+                }
+
                 userAccountAddress = accounts[0];
-                client = createClient({ chain: studionet, account: userAccountAddress, provider });
+                document.getElementById("userAddress").innerText = userAccountAddress;
 
-                // Make sure the wallet is actually on the studionet chain
-                // (adds it to the wallet if it isn't there yet). Without this,
-                // writeContract calls fail with a chainId mismatch error.
-                logEvent("Switching wallet to studionet...");
-                await client.connect("studionet");
+                logEvent(
+                    `Account changed: ${userAccountAddress.substring(0, 6)}...`,
+                    "success"
+                );
+            });
 
-                document.getElementById('userAddress').innerText = userAccountAddress;
-                document.getElementById('walletInfo').classList.remove('hidden');
-                connectBtn.innerText = "Disconnect";
-                generateBtn.removeAttribute('disabled');
-                submitBtn.removeAttribute('disabled');
-                logEvent(`Connected: ${userAccountAddress.substring(0, 6)}...`, "success");
+            provider.on("chainChanged", async chainId => {
+                const targetChainId = "0x" + studionet.id.toString(16);
+
+                if (String(chainId).toLowerCase() !== targetChainId.toLowerCase()) {
+                    generateBtn.disabled = true;
+                    submitBtn.disabled = true;
+
+                    logEvent(
+                        `Wrong network: ${chainId}. Please switch back to ${studionet.name}.`,
+                        "error"
+                    );
+                    return;
+                }
+
+                try {
+                    await ensureCorrectChain(provider);
+                    generateBtn.disabled = false;
+                    submitBtn.disabled = false;
+                    logEvent(
+                        `Network switched back to ${studionet.name}.`,
+                        "success"
+                    );
+                } catch (err) {
+                    generateBtn.disabled = true;
+                    submitBtn.disabled = true;
+                    logEvent(`Network validation failed: ${err?.message || err}`, "error");
+                }
+            });
+        }
+
+        connectBtn.addEventListener("click", async () => {
+
+            if (client) {
+                resetConnectedUI();
+                return;
+            }
+
+            try {
+                logEvent("Searching for installed wallets...");
+
+                const wallets = await discoverWallets();
+
+                if (!wallets.length) {
+                    logEvent(
+                        "No Web3 wallet detected. Make sure your wallet extension is installed and enabled.",
+                        "error"
+                    );
+                    return;
+                }
+
+                logEvent(
+                    `Detected ${wallets.length} wallet provider(s): ${wallets.map(w => getWalletName(w.info, w.provider)).join(", ")}`,
+                    "success"
+                );
+
+                const selectedWallet = await showWalletSelector(wallets);
+
+                if (!selectedWallet) {
+                    logEvent("Wallet selection cancelled.", "warning");
+                    return;
+                }
+
+                // DO NOT call getWalletName({}, provider) here.
+                // Keep the original EIP-6963 info attached to the selected provider.
+                selectedWalletDetail = selectedWallet;
+
+                const provider = selectedWallet.provider;
+                const selectedWalletName = getWalletName(selectedWallet.info, provider);
+
+                logEvent(
+                    `Selected wallet: ${selectedWalletName}` +
+                    (selectedWallet.info?.rdns ? ` (${selectedWallet.info.rdns})` : ""),
+                    "success"
+                );
+
+                const accounts = await provider.request({
+                    method: "eth_requestAccounts"
+                });
+
+                if (!accounts || !accounts.length) {
+                    throw new Error("Wallet returned no accounts.");
+                }
+
+                userAccountAddress = accounts[0];
+
+                // Pass the EXACT provider selected by the user into genlayer-js.
+                client = createClient({
+                    chain: studionet,
+                    account: userAccountAddress,
+                    provider: provider
+                });
+
+                logEvent("Checking GenLayer network...", "info");
+                await ensureCorrectChain(provider);
+
+                document.getElementById("userAddress").innerText = userAccountAddress;
+                document.getElementById("walletInfo").classList.remove("hidden");
+
+                connectBtn.innerHTML =
+                    '<i class="fa-solid fa-link"></i><span>Disconnect</span>';
+
+                generateBtn.disabled = false;
+                submitBtn.disabled = false;
+
+                logEvent(
+                    `Connected to ${selectedWalletName}: ${userAccountAddress.substring(0, 6)}...${userAccountAddress.substring(userAccountAddress.length - 4)}`,
+                    "success"
+                );
+
+                attachProviderListeners(provider);
+
             } catch (err) {
-                logEvent(`Connection Failed: ${err.message}`, "error");
+                console.error("Wallet connection error:", err);
+                resetConnectedUI(`Connection Failed: ${err?.message || err}`);
             }
         });
+
         //alert("Sending to Contract: " + CONTRACT_ADDRESS);
         generateBtn.addEventListener('click', async () => {
             const loader = document.getElementById('scenarioLoader');
