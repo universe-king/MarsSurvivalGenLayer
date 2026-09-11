@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - Mars Survival</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            background: radial-gradient(circle at center, #1e0b07 0%, #090302 100%);
+        }
+
+        .nebula {
+            position: fixed;
+            inset: 0;
+            z-index: -5;
+            pointer-events: none;
+            background: radial-gradient(circle at 20% 30%, rgba(255, 80, 40, .12), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(80, 120, 255, .10), transparent 25%),
+                radial-gradient(circle at 50% 80%, rgba(255, 255, 255, .05), transparent 20%)
+        }
+
+        .mars-glow {
+            position: fixed;
+            right: -40px;
+            top: -40px;
+            width: 620px;
+            height: 620px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -3;
+            background: radial-gradient(circle, rgba(255, 120, 40, .18) 0%, rgba(255, 120, 40, .08) 35%, transparent 75%);
+            filter: blur(45px);
+        }
+
+        .stars-back,
+        .stars-mid,
+        .stars-front {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .stars-back {
+            z-index: -6;
+        }
+
+        .stars-mid {
+            z-index: -5;
+        }
+
+        .stars-front {
+            z-index: -4;
+        }
+
+        .star-back,
+        .star-mid,
+        .star-front {
+            position: absolute;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .star-back {
+            width: 1px;
+            height: 1px;
+        }
+
+        .star-mid {
+            width: 2px;
+            height: 2px;
+        }
+
+        .star-front {
+            width: 3px;
+            height: 3px;
+        }
+
+        @keyframes twinkle {
+            0% {
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.2;
+            }
+        }
+
+        section {
+            transition: transform .25s ease, box-shadow .25s ease;
+        }
+
+        section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(255, 120, 40, .08);
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "genlayer-js": "https://esm.sh/genlayer-js@latest",
+                "genlayer-js/chains": "https://esm.sh/genlayer-js@latest/chains",
+                "genlayer-js/types": "https://esm.sh/genlayer-js@latest/types"
+            }
+        }
+    </script>
+</head>
+
+<body class="text-gray-100 min-h-screen font-sans antialiased selection:bg-red-500 selection:text-white">
+
+    <div class="nebula"></div>
+    <div class="mars-glow"></div>
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+
+        <header
+            class="flex flex-col sm:flex-row justify-between items-center border-b border-red-900/40 pb-6 mb-8 gap-4">
+
+            <div>
+                <h1
+                    class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-yellow-500">
+                    🏆 LEADERBOARD
+                </h1>
+
+                <p class="text-xs text-gray-400 mt-1">
+                    Powered by GenLayer AI Consensus (Studionet)
+                </p>
+            </div>
+
+            <div class="ml-auto flex items-center gap-3">
+                <a href="index.html"
+                    class="bg-red-900/10 hover:bg-red-800 text-white px-4 py-2 rounded-xl border border-red-700 transition cursor-pointer flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Back to Mission</span>
+                </a>
+            </div>
+
+        </header>
+
+        <main>
+
+            <section class="bg-stone-900/40 border border-stone-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm">
+
+                <div class="flex items-center justify-between gap-3 mb-4">
+
+                    <div class="flex items-center gap-3">
+
+                        <span
+                            class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-950 text-red-400 font-bold border border-red-800/50">
+                            <i class="fa-solid fa-ranking-star"></i>
+                        </span>
+
+                        <h2 class="text-xl font-bold text-stone-200">
+                            Survivor Leaderboard
+                        </h2>
+
+                    </div>
+
+                    <button id="refreshLeaderboardBtn"
+                        class="text-xs text-stone-400 hover:text-red-300 border border-stone-700 hover:border-red-800/60 rounded-lg px-3 py-1.5 transition-colors cursor-pointer">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+
+                </div>
+
+                <div id="leaderboardLoader" class="text-center py-6 text-stone-400 animate-pulse font-mono text-sm">
+                    ⏳ Loading leaderboard...
+                </div>
+
+                <div id="leaderboardEmpty" class="hidden text-center py-6 text-stone-500 text-sm font-mono">
+                    No judged astronauts yet. Be the first to survive (or die) on Mars.
+                </div>
+
+                <div id="leaderboardError" class="hidden text-center py-6 text-red-400 text-sm font-mono">
+                </div>
+
+                <div id="leaderboardWrap" class="hidden overflow-x-auto">
+
+                    <table class="w-full text-sm text-left">
+
+                        <thead>
+
+                            <tr class="text-stone-500 uppercase text-xs border-b border-stone-800">
+
+                                <th class="py-2 pr-4 font-bold">#</th>
+
+                                <th class="py-2 pr-4 font-bold">
+                                    Astronaut
+                                </th>
+
+                                <th class="py-2 pr-4 font-bold text-emerald-400">
+                                    Survived
+                                </th>
+
+                                <th class="py-2 pr-4 font-bold text-red-400">
+                                    Died
+                                </th>
+
+                                <th class="py-2 pr-4 font-bold">
+                                    Survival Rate
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="leaderboardBody" class="font-mono text-stone-300">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </main>
+
+        <footer class="mt-12 border-t border-red-900/30 py-8 text-center text-xs text-gray-500">
+            Mars Survival - GenLayer Studio Edition
+        </footer>
+
+    </div>
+
+    <script type="module">
+
+        import { createClient, createAccount } from "genlayer-js";
+        import { studionet as studionetBase } from "genlayer-js/chains";
+
+
+        // Same override as the main page: the default studionet block
+        // explorer URL is paused, point wallets/links at the live one.
+        const studionet = {
+            ...studionetBase,
+            blockExplorers: {
+                default: {
+                    name: "GenLayer Studio Explorer",
+                    url: "https://explorer-studio.genlayer.com"
+                }
+            }
+        };
+
+
+        // ================================================================
+        // AFTER DEPLOY:
+        // Put your NEW contract address here.
+        // ================================================================
+        const CONTRACT_ADDRESS = "0x86b811b139924dD49E6259A9329456C97e08783B";
+
+
+        // Read-only client: get_leaderboard is a view function, so no
+        // wallet connection is required to view this page. genlayer-js's
+        // readContract still expects an "account" field to build the call,
+        // so we generate a disposable local keypair purely to satisfy that -
+        // it never signs or sends anything, it only reads state.
+        const readOnlyAccount = createAccount();
+
+        const client = createClient({
+            chain: studionet,
+            account: readOnlyAccount
+        });
+
+
+        async function loadLeaderboard(isRetry = false) {
+
+            const loader = document.getElementById('leaderboardLoader');
+            const empty = document.getElementById('leaderboardEmpty');
+            const errorBox = document.getElementById('leaderboardError');
+            const wrap = document.getElementById('leaderboardWrap');
+            const body = document.getElementById('leaderboardBody');
+
+
+            loader.classList.remove('hidden');
+            empty.classList.add('hidden');
+            errorBox.classList.add('hidden');
+            wrap.classList.add('hidden');
+
+
+            try {
+
+                const raw = await client.readContract({
+                    address: CONTRACT_ADDRESS,
+                    functionName: 'get_leaderboard',
+                    args: []
+                });
+
+
+                const rows =
+                    typeof raw === 'string'
+                        ? JSON.parse(raw)
+                        : raw;
+
+
+                if (!rows || !rows.length) {
+
+                    loader.classList.add('hidden');
+                    empty.classList.remove('hidden');
+
+                    return;
+                }
+
+
+                body.innerHTML = rows.map((row, i) => {
+
+                    const addr = String(row.address || '');
+
+                    const short =
+                        addr.length > 10
+                            ? `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`
+                            : addr;
+
+
+                    return `
+                        <tr class="border-b border-stone-900">
+
+                            <td class="py-2 pr-4 text-stone-500">
+                                ${i + 1}
+                            </td>
+
+                            <td class="py-2 pr-4">
+                                ${short}
+                            </td>
+
+                            <td class="py-2 pr-4 text-emerald-400">
+                                ${row.survived ?? 0}
+                            </td>
+
+                            <td class="py-2 pr-4 text-red-400">
+                                ${row.died ?? 0}
+                            </td>
+
+                            <td class="py-2 pr-4">
+                                ${row.survival_rate ?? 0}%
+                            </td>
+
+                        </tr>
+                    `;
+
+                }).join('');
+
+
+                loader.classList.add('hidden');
+                wrap.classList.remove('hidden');
+
+
+            } catch (err) {
+
+                // The Studionet RPC endpoint occasionally times out under load;
+                // give it one silent retry before surfacing an error.
+                const looksTransient =
+                    /fetch|timeout|network/i.test(
+                        String(err?.message || err)
+                    );
+
+
+                if (looksTransient && !isRetry) {
+                    return loadLeaderboard(true);
+                }
+
+
+                console.error(
+                    "Could not load leaderboard:",
+                    err
+                );
+
+
+                loader.classList.add('hidden');
+
+                errorBox.textContent =
+                    `⚠️ Could not load leaderboard: ${err?.message || err}`;
+
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+
+        document
+            .getElementById('refreshLeaderboardBtn')
+            .addEventListener('click', loadLeaderboard);
+
+
+        loadLeaderboard();
+
+
+        // ===== Starfield background (visual only, matches main page) =====
+        function createLayer(className, count, starClass) {
+
+            const layer = document.createElement('div');
+
+            layer.className = className;
+
+
+            for (let i = 0; i < count; i++) {
+
+                const star = document.createElement('div');
+
+                star.className = starClass;
+
+                star.style.left =
+                    Math.random() * 100 + '%';
+
+                star.style.top =
+                    Math.random() * 100 + '%';
+
+
+                const duration =
+                    2 + Math.random() * 6;
+
+                const delay =
+                    Math.random() * 10;
+
+
+                star.style.animation =
+                    `twinkle ${duration}s infinite`;
+
+                star.style.animationDelay =
+                    `${delay}s`;
+
+
+                layer.appendChild(star);
+            }
+
+
+            document.body.appendChild(layer);
+        }
+
+
+        createLayer('stars-back', 180, 'star-back');
+        createLayer('stars-mid', 120, 'star-mid');
+        createLayer('stars-front', 80, 'star-front');
+
+    </script>
+
+</body>
+
+</html>
