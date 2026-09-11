@@ -319,6 +319,11 @@
             </div>
             <div class="ml-auto flex items-center gap-3">
 
+                <a href="leaderboard.html"
+                    class="bg-black/30 hover:bg-red-900/30 text-stone-300 hover:text-red-200 px-4 py-2 rounded-xl border border-stone-700 hover:border-red-800/60 transition cursor-pointer flex items-center gap-2">
+                    <i class="fa-solid fa-ranking-star"></i><span>Leaderboard</span>
+                </a>
+
                 <button id="connectBtn"
                     class="bg-red-900/10 hover:bg-red-800 text-white px-4 py-2 rounded-xl border border-red-700 transition cursor-pointer flex items-center gap-2">
                     <i class="fa-solid fa-wallet"></i><span>Connect Wallet</span>
@@ -384,6 +389,21 @@
                         <p id="verdictLog"
                             class="text-gray-300 text-sm leading-relaxed max-w-2xl mx-auto pt-4 border-t border-white/10 whitespace-pre-wrap">
                         </p>
+                        <div id="progressionStats"
+                            class="hidden flex flex-wrap justify-center gap-4 pt-4 text-sm font-mono">
+                            <div class="bg-black/30 border border-white/10 rounded-xl px-4 py-2">
+                                <span class="text-gray-500">Sol:</span>
+                                <span id="statSol" class="text-yellow-300 font-bold ml-1">-</span>
+                            </div>
+                            <div class="bg-black/30 border border-white/10 rounded-xl px-4 py-2">
+                                <span class="text-gray-500">Survived:</span>
+                                <span id="statSurvived" class="text-emerald-400 font-bold ml-1">-</span>
+                            </div>
+                            <div class="bg-black/30 border border-white/10 rounded-xl px-4 py-2">
+                                <span class="text-gray-500">Died:</span>
+                                <span id="statDied" class="text-red-400 font-bold ml-1">-</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -435,11 +455,29 @@
     </script>
     <script type="module">
         import { createClient } from "genlayer-js";
-        import { studionet } from "genlayer-js/chains";
+        import { studionet as studionetBase } from "genlayer-js/chains";
         import { TransactionStatus } from "genlayer-js/types";
 
-        const CONTRACT_ADDRESS = "0x86b783a21EF1D1224346F9D11333E671dADDBDBf";
+        // ============================================================
+        // OVERRIDE BLOCK EXPLORER URL
+        // The default studionet chain config points to
+        // https://genlayer-explorer.vercel.app which has been paused by
+        // its owner (Vercel DEPLOYMENT_PAUSED). We override just the
+        // blockExplorers field here, without touching node_modules,
+        // so wallets add/use the correct, currently-live explorer.
+        // ============================================================
+        const studionet = {
+            ...studionetBase,
+            blockExplorers: {
+                default: {
+                    name: "GenLayer Studio Explorer",
+                    url: "https://explorer-studio.genlayer.com"
+                }
+            }
+        };
 
+
+        const CONTRACT_ADDRESS = "0x86b811b139924dD49E6259A9329456C97e08783B";
         let client = null;
         let userAccountAddress = null;
         let currentScenarioText = "";
@@ -1090,6 +1128,20 @@
 
                 attachProviderListeners(provider);
 
+                // NEW: show the user's current persistent progression as soon
+                // as we connect, using the new get_sol/get_survival_count/
+                // get_death_count view functions on the contract.
+                try {
+                    const [sol, survived, died] = await Promise.all([
+                        client.readContract({ address: CONTRACT_ADDRESS, functionName: 'get_sol', args: [userAccountAddress] }),
+                        client.readContract({ address: CONTRACT_ADDRESS, functionName: 'get_survival_count', args: [userAccountAddress] }),
+                        client.readContract({ address: CONTRACT_ADDRESS, functionName: 'get_death_count', args: [userAccountAddress] })
+                    ]);
+                    logEvent(`Current progression -> Sol: ${sol}, Survived: ${survived}, Died: ${died}`, "info");
+                } catch (progressionErr) {
+                    console.debug("Could not fetch progression on connect:", progressionErr);
+                }
+
             } catch (err) {
                 console.error("Wallet connection error:", err);
                 resetConnectedUI(`Connection Failed: ${err?.message || err}`);
@@ -1177,12 +1229,21 @@
 
                 let finalStatus = "DIED";
                 let finalExplanation = res.toString();
+                // NEW: persistent progression fields returned by the contract
+                let finalSol = null;
+                let finalSurvivalCount = null;
+                let finalDeathCount = null;
 
                 try {
                     const parsed = typeof res === 'string' ? JSON.parse(res) : res;
                     if (parsed.status && parsed.explanation) {
                         finalStatus = parsed.status;
                         finalExplanation = parsed.explanation;
+                        // NEW: pull the progression fields out of the same JSON
+                        // the contract already returns (see mars910.py judge_survival).
+                        if (typeof parsed.sol !== "undefined") finalSol = parsed.sol;
+                        if (typeof parsed.survival_count !== "undefined") finalSurvivalCount = parsed.survival_count;
+                        if (typeof parsed.death_count !== "undefined") finalDeathCount = parsed.death_count;
                     } else if (res.toString().includes("SURVIVED")) {
                         finalStatus = "SURVIVED";
                     }
@@ -1190,7 +1251,7 @@
                     if (res.toString().includes("SURVIVED")) finalStatus = "SURVIVED";
                 }
 
-                renderResult(finalStatus, finalExplanation);
+                renderResult(finalStatus, finalExplanation, finalSol, finalSurvivalCount, finalDeathCount);
 
             } catch (err) {
                 logEvent(`Judgment Failed: ${err.message}`, "error");
@@ -1198,16 +1259,34 @@
             }
         });
 
-        function renderResult(status, text) {
+        function renderResult(status, text, sol = null, survivalCount = null, deathCount = null) {
             document.getElementById('verdictLoader').classList.add('hidden');
             const badge = document.getElementById('statusBadge');
             const log = document.getElementById('verdictLog');
             const card = document.getElementById('verdictCard');
+            // NEW: persistent progression stats block
+            const statsBox = document.getElementById('progressionStats');
+            const statSol = document.getElementById('statSol');
+            const statSurvived = document.getElementById('statSurvived');
+            const statDied = document.getElementById('statDied');
 
             badge.classList.remove('hidden');
             log.classList.remove('hidden');
             badge.innerText = status;
             log.innerText = text;
+
+            // NEW: only show the stats row when the contract actually returned
+            // progression data (keeps this backward-compatible with older
+            // contract deployments that don't return sol/survival_count/death_count).
+            if (sol !== null || survivalCount !== null || deathCount !== null) {
+                statSol.innerText = sol !== null ? sol : "-";
+                statSurvived.innerText = survivalCount !== null ? survivalCount : "-";
+                statDied.innerText = deathCount !== null ? deathCount : "-";
+                statsBox.classList.remove('hidden');
+                logEvent(`Progression updated -> Sol: ${sol}, Survived: ${survivalCount}, Died: ${deathCount}`, "success");
+            } else {
+                statsBox.classList.add('hidden');
+            }
 
             if (status === "SURVIVED") {
                 card.className = "bg-emerald-950/30 border border-emerald-500/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md";
@@ -1269,10 +1348,10 @@
             const textureLoader = new THREE.TextureLoader();
 
 
-            const marsTexture = textureLoader.load('images/mars.jpg');
+            const marsTexture = textureLoader.load('public/images/mars.jpg');
             marsTexture.colorSpace = THREE.SRGBColorSpace;
 
-            const qamarTexture = textureLoader.load('images/qamar.jpg');
+            const qamarTexture = textureLoader.load('public/images/qamar.jpg');
             qamarTexture.colorSpace = THREE.SRGBColorSpace;
 
 
