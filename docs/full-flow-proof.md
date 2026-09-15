@@ -153,7 +153,7 @@ The scenario was returned by the finalized `generate_scenario` transaction and s
 
 ### Generated Scenario Application Evidence
 
-![Generated Scenario](docs/images/generated-scenario.png)
+![Generated Scenario](images/generated-scenario.png)
 
 ---
 
