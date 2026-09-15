@@ -51,7 +51,7 @@ The application confirmed the wallet connection before executing the scenario ge
 ### Wallet Connection Evidence
 
 ![Wallet Connection](images/wallet-connected.png)
-![Wallet Connection](docs/images/wallet-connected-1.png)
+![Wallet Connection](images/wallet-connected-1.png)
 
 ---
 
@@ -126,10 +126,10 @@ Finalized
 ```
 
 ### Scenario Generation Transaction Evidence
-![Scenario Generation Transaction](docs/images/Scenario Generation Transaction.png)
-![Scenario Generation Transaction](docs/images/Scenario Generation Transaction-1.png)
-![Scenario Generation Transaction](docs/images/Scenario Generation Transaction-2.png)
-![Scenario Generation](docs/images/scenario-generation.png)
+![Scenario Generation Transaction](images/Scenario Generation Transaction.png)
+![Scenario Generation Transaction](images/Scenario Generation Transaction-1.png)
+![Scenario Generation Transaction](images/Scenario Generation Transaction-2.png)
+![Scenario Generation](images/scenario-generation.png)
 
 ---
 
