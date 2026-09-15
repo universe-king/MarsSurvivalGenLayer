@@ -151,9 +151,8 @@ The generated scenario contains the following three tactical questions:
 
 The scenario was returned by the finalized `generate_scenario` transaction and subsequently displayed by the application.
 
-### Generated Scenario Application Evidence
 
-![Generated Scenario](images/generated-scenario.png)
+
 
 ---
 
@@ -181,7 +180,7 @@ Scenario displayed to user
 
 ### Scenario Readback Evidence
 
-<!-- INSERT SCREENSHOT HERE -->
+![Generated Scenario](images/generated-scenario.png)
 
 ---
 
@@ -247,7 +246,9 @@ This is not a sample or hypothetical strategy. It is the actual parameter record
 
 ### Submitted Strategy / Transaction Evidence
 
-<!-- INSERT SCREENSHOT HERE -->
+![Submitted Strategy / Transaction](images/Submitted-Strategy-Transaction.png)
+![Submitted Strategy / Transaction](images/Submitted-Strategy-Transaction1.png)
+![Submitted Strategy / Transaction](images/Submitted-Strategy-Transaction2.png)
 
 ---
 
@@ -302,7 +303,7 @@ SURVIVED
 
 ### Consensus Evidence
 
-<!-- INSERT SCREENSHOT HERE -->
+![Submitted Strategy / Transaction](images/Consensus.png)
 
 ---
 
@@ -320,7 +321,8 @@ The application received the completed judgment and displayed the survival resul
 
 ### Final Judgment Application Evidence
 
-<!-- INSERT SCREENSHOT HERE -->
+![GenLayer Consensus](images/consensus-survived.png)
+![GenLayer Consensus](images/consensus-survived-1.png)
 
 ---
 
@@ -366,7 +368,7 @@ This provides application-level state readback corresponding to the recorded sur
 
 ### Leaderboard Evidence
 
-<!-- INSERT SCREENSHOT HERE -->
+![Leaderboard](images/leaderboard.png)
 
 ---
 
@@ -478,36 +480,11 @@ https://explorer-studio.genlayer.com/address/0x86b811b139924dD49E6259A9329456C97
 
 ### Contract Evidence
 
-<!-- INSERT SCREENSHOT HERE -->
+![Contract](images/Contract.png)
 
 ---
 
-# 15. Execution Video
-
-A video recording of the application flow is provided as additional visual evidence.
-
-The recording demonstrates the application-side execution flow, including:
-
-* Wallet connection
-* Scenario generation
-* Scenario display
-* Survival strategy submission
-* Transaction execution
-* GenLayer consensus
-* Final judgment
-* Result display
-
-**Execution Video:**
-
-https://drive.google.com/file/d/1suruKmHeP4V26O7kO3dER_7oOl_T2d0y/
-
-### Video Evidence
-
-<!-- INSERT SCREENSHOT HERE -->
-
----
-
-# 16. Evidence Checklist
+# 15. Evidence Checklist
 
 | Requirement            | Evidence                                  |
 | ---------------------- | ----------------------------------------- |
@@ -530,7 +507,7 @@ https://drive.google.com/file/d/1suruKmHeP4V26O7kO3dER_7oOl_T2d0y/
 
 ---
 
-# 17. Conclusion
+# 16. Conclusion
 
 This document provides a concrete execution record of the Mars Survival application's complete flow on GenLayer Studio Network.
 
