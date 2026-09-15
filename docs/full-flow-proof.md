@@ -342,10 +342,6 @@ This result is supported by the finalized transaction's:
 * `SURVIVED` Equivalence Principle Output
 * `SURVIVED` return value
 
-### Application Result Screenshot
-
-<!-- INSERT SCREENSHOT HERE -->
-
 ---
 
 # 11. Contract / Application State Readback
