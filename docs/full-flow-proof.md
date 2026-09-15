@@ -473,6 +473,7 @@ https://explorer-studio.genlayer.com/tx/0x53b166554c558e96158fda5bcb056ad8340465
 **Contract Address:**
 
 `0x86b811b139924dD49E6259A9329456C97e08783B`
+
 https://studio.genlayer.com/?import-contract=0x86b811b139924dD49E6259A9329456C97e08783B
 
 **Explorer:**
